@@ -28,3 +28,13 @@ npm run dev
 - API locale Express su `http://127.0.0.1:8787`
 
 Il frontend usa il proxy Vite su `/api`, quindi l'archivio funziona senza esporre la connessione Neon nel browser.
+
+## Deploy su Vercel
+
+Per il deploy su Vercel l'archivio usa funzioni serverless sotto `api/`, quindi:
+
+1. imposta `DATABASE_URL` nelle Environment Variables del progetto
+2. esegui un nuovo deploy dopo aver aggiornato il codice
+3. verifica `https://tuo-dominio/api/health`
+
+Se `/api/health` risponde con JSON, anche le route dell'archivio (`/api/receipts`) sono pubblicate correttamente.
