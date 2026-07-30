@@ -216,19 +216,6 @@ export function SectionsBuilder({
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.45)]">
-        <button
-          type="button"
-          onClick={() => setIsAddSectionsModalOpen(true)}
-          className="flex w-full items-center justify-center gap-3 px-5 py-5 text-center transition duration-200 hover:bg-slate-50 dark:hover:bg-slate-800"
-        >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
-            <Plus className="h-4 w-4" />
-          </span>
-          <span className="text-base font-bold text-slate-800 dark:text-slate-100">Aggiungi sezione</span>
-        </button>
-      </section>
-
       {draft.builderSections.map((section) => {
         const sectionDefinition = BUILDER_SECTION_OPTIONS.find((entry) => entry.value === section.type);
         const Icon = sectionIcons[section.type];
@@ -751,9 +738,9 @@ export function SectionsBuilder({
                 </p>
                 <input
                   type="range"
-                  min="0"
+                  min="-16"
                   max="48"
-                  step="2"
+                  step="1"
                   value={draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}
                   onChange={(event) => handleUpdateSectionSpacing(section.id, Number.parseInt(event.target.value, 10))}
                   className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
@@ -763,6 +750,19 @@ export function SectionsBuilder({
           </div>
         );
       })}
+
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_18px_40px_rgba(2,6,23,0.45)]">
+        <button
+          type="button"
+          onClick={() => setIsAddSectionsModalOpen(true)}
+          className="flex w-full items-center justify-center gap-3 px-5 py-5 text-center transition duration-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+        >
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
+            <Plus className="h-4 w-4" />
+          </span>
+          <span className="text-base font-bold text-slate-800 dark:text-slate-100">Aggiungi sezione</span>
+        </button>
+      </section>
 
       {isAddSectionsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.34)] backdrop-blur-sm px-4 py-6" role="dialog" aria-modal="true" aria-label="Aggiungi sezioni">

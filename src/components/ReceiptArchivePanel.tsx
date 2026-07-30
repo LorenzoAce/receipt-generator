@@ -67,7 +67,7 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
 
     try {
       const saved = await createArchivedReceipt(archiveName.trim() || suggestedName, draft);
-      setSelectedId(saved.id);
+      setSelectedId(null);
       setArchiveName(saved.name);
       setMessage("Ricevuta salvata nell'archivio.");
       await loadArchive();
@@ -80,7 +80,7 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
 
   const handleUpdate = async () => {
     if (!selectedId) {
-      setError("Seleziona prima una ricevuta da aggiornare.");
+      setError("Seleziona dall'elenco la ricevuta da sovrascrivere.");
       return;
     }
 
@@ -91,7 +91,7 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
     try {
       const updated = await updateArchivedReceipt(selectedId, archiveName.trim() || suggestedName, draft);
       setArchiveName(updated.name);
-      setMessage("Ricevuta aggiornata correttamente.");
+      setMessage("Ricevuta selezionata sovrascritta correttamente.");
       await loadArchive();
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : "Aggiornamento non riuscito.");
@@ -159,9 +159,6 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition duration-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20"
           />
         </label>
-        <p className="text-xs text-slate-500 dark:text-slate-400">
-          Salva il draft corrente su Neon, poi potrai ricaricarlo, aggiornarlo o eliminarlo dall'archivio.
-        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -181,16 +178,7 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
           className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-700 transition duration-200 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <RefreshCw className="h-4 w-4" />
-          Aggiorna
-        </button>
-        <button
-          type="button"
-          onClick={() => void loadArchive()}
-          disabled={isSaving || isLoading}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition duration-200 hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-500/60 dark:hover:bg-slate-800"
-        >
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-          Aggiorna elenco
+          Sovrascrivi
         </button>
       </div>
 
@@ -213,23 +201,20 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
             return (
               <article
                 key={receipt.id}
+                onClick={() => {
+                  setSelectedId(receipt.id);
+                  setArchiveName(receipt.name);
+                }}
                 className={cn(
-                  "rounded-2xl border px-4 py-4 transition duration-200",
+                  "cursor-pointer rounded-2xl border px-4 py-4 transition duration-200",
                   isSelected ? "border-blue-200 bg-blue-50/70 dark:border-blue-500/50 dark:bg-blue-500/10" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900",
                 )}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedId(receipt.id);
-                        setArchiveName(receipt.name);
-                      }}
-                      className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100"
-                    >
+                    <div className="text-left text-sm font-semibold text-slate-800 dark:text-slate-100">
                       {receipt.name}
-                    </button>
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       {receipt.paperWidth} · {receipt.templateId} · aggiornato {formatArchiveDate(receipt.updatedAt)}
                     </p>
@@ -237,7 +222,10 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => void handleLoad(receipt.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleLoad(receipt.id);
+                      }}
                       className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition duration-200 hover:border-blue-200 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-500/60 dark:hover:bg-slate-800"
                     >
                       <Download className="h-3.5 w-3.5" />
@@ -245,7 +233,10 @@ export function ReceiptArchivePanel({ draft, onApplyDraft }: ReceiptArchivePanel
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleDelete(receipt.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleDelete(receipt.id);
+                      }}
                       className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 transition duration-200 hover:bg-rose-100"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
