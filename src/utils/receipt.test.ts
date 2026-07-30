@@ -1,4 +1,12 @@
-import { buildReceiptLines, calculateSummary, createDefaultDraft, normalizeDraft, reorderBuilderSections } from "./receipt";
+import {
+  buildReceiptLines,
+  calculateSummary,
+  createBuilderSection,
+  createDefaultDraft,
+  createFreeTextBlock,
+  normalizeDraft,
+  reorderBuilderSections,
+} from "./receipt";
 
 describe("receipt helpers", () => {
   it("calcola correttamente subtotale IVA e totale", () => {
@@ -17,7 +25,20 @@ describe("receipt helpers", () => {
   it("genera linee compatibili con il formato stretto", () => {
     const draft = createDefaultDraft();
     draft.paperWidth = "62mm";
-    draft.builderSections = ["header", "datetime", "columns", "line-items", "payment"];
+    draft.builderSections = [
+      createBuilderSection("header", "header"),
+      createBuilderSection("datetime", "datetime"),
+      createBuilderSection("columns", "columns"),
+      createBuilderSection("line-items", "line-items"),
+      createBuilderSection("payment", "payment"),
+    ];
+    draft.sectionSeparators = {
+      header: "equals",
+      datetime: "equals",
+      columns: "equals",
+      "line-items": "equals",
+      payment: "equals",
+    };
 
     const lines = buildReceiptLines(draft);
 
@@ -36,27 +57,36 @@ describe("receipt helpers", () => {
 
     expect(draft.merchantName).toBe("Test Shop");
     expect(draft.layout.currencyDisplay).toBe("value-space-symbol");
+    expect(draft.layout.sectionSpacing).toBe(20);
     expect(draft.builderSections).toEqual([]);
+    expect(draft.sectionSpacing).toEqual({});
     expect(draft.columnsLeftLabel).toBe("Articolo");
     expect(draft.barcodeType).toBe("barcode");
     expect(draft.barcodeLink).toContain("https://");
     expect(draft.qrShape).toBe("square");
     expect(draft.qrSize).toBe(160);
+    expect(draft.freeTextBlocks).toEqual([]);
   });
 
   it("riordina le sezioni del builder quando trascinate", () => {
     const reordered = reorderBuilderSections(
-      ["header", "datetime", "payment", "barcode"],
+      [
+        createBuilderSection("header", "header"),
+        createBuilderSection("datetime", "datetime"),
+        createBuilderSection("payment", "payment"),
+        createBuilderSection("barcode", "barcode"),
+      ],
       "barcode",
       "datetime",
     );
 
-    expect(reordered).toEqual(["header", "barcode", "datetime", "payment"]);
+    expect(reordered.map((section) => section.type)).toEqual(["header", "barcode", "datetime", "payment"]);
   });
 
   it("genera linee testo per QR code da link", () => {
     const draft = createDefaultDraft();
-    draft.builderSections = ["barcode"];
+    draft.builderSections = [createBuilderSection("barcode", "barcode")];
+    draft.sectionSeparators = { barcode: "equals" };
     draft.barcodeType = "qr-link";
     draft.barcodeLink = "https://example.com/r/456";
 
@@ -66,9 +96,29 @@ describe("receipt helpers", () => {
     expect(lines.some((line) => line.includes("https://example.com/r/456"))).toBe(true);
   });
 
+  it("genera linee testo per la sezione testo libero", () => {
+    const draft = createDefaultDraft();
+    draft.builderSections = [createBuilderSection("free-text", "free-1")];
+    draft.paperWidth = "62mm";
+    draft.freeTextBlocks = [
+      createFreeTextBlock("free-1", {
+        content: "<div><strong>Prima riga</strong></div><div>Testo molto lungo da spezzare nel formato stretto</div>",
+        alignment: "right",
+      }),
+    ];
+    draft.sectionSeparators = { "free-1": "equals" };
+
+    const lines = buildReceiptLines(draft);
+
+    expect(lines.some((line) => line.includes("Prima riga"))).toBe(true);
+    expect(lines.some((line) => line.includes("Testo molto lungo"))).toBe(true);
+    expect(lines.every((line) => line.length <= 24)).toBe(true);
+  });
+
   it("rispetta l'ordine delle builderSections nelle linee esportate", () => {
     const draft = createDefaultDraft();
-    draft.builderSections = ["payment", "header"];
+    draft.builderSections = [createBuilderSection("payment", "payment"), createBuilderSection("header", "header")];
+    draft.sectionSeparators = { payment: "equals", header: "equals" };
 
     const lines = buildReceiptLines(draft);
     const totalIndex = lines.findIndex((line) => line.includes("Totale"));

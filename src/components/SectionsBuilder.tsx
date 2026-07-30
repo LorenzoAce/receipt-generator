@@ -14,15 +14,18 @@ import {
   Plus,
   ReceiptText,
   ScanBarcode,
+  Type,
   Trash2,
   X,
 } from "lucide-react";
 import { CollapsibleCard } from "./CollapsibleCard";
+import { RichTextEditor } from "./RichTextEditor";
 import { cn } from "../lib/utils";
 import {
   BUILDER_SECTION_OPTIONS,
   SECTION_SEPARATOR_OPTIONS,
   formatCurrency,
+  FREE_TEXT_FONT_OPTIONS,
   type BarcodeContentType,
   type QrShape,
   type SectionSeparatorStyle,
@@ -36,8 +39,9 @@ type SectionsBuilderProps = {
   draft: ReceiptDraft;
   onUpdateDraft: <K extends keyof ReceiptDraft>(field: K, value: ReceiptDraft[K]) => void;
   onAddSection: (section: BuilderSectionType) => void;
-  onRemoveSection: (section: BuilderSectionType) => void;
-  onMoveSection: (draggedSection: BuilderSectionType, targetSection: BuilderSectionType) => void;
+  onRemoveSection: (sectionId: string) => void;
+  onMoveSection: (draggedSectionId: string, targetSectionId: string) => void;
+  onUpdateFreeTextBlock: (sectionId: string, updates: Partial<ReceiptDraft["freeTextBlocks"][number]>) => void;
   onAddItem: () => void;
   onRemoveItem: (id: string) => void;
   onUpdateItem: <K extends keyof ReceiptItem>(id: string, field: K, value: ReceiptItem[K]) => void;
@@ -50,6 +54,7 @@ const sectionIcons = {
   "line-items": Package2,
   payment: CreditCard,
   "custom-message": MessageSquareQuote,
+  "free-text": Type,
   image: ImagePlus,
   barcode: ScanBarcode,
   "vat-details": ReceiptText,
@@ -65,10 +70,10 @@ function Field({
   wide?: boolean;
 }) {
   return (
-    <label className={wide ? "space-y-2 md:col-span-2" : "space-y-2"}>
+    <div className={wide ? "space-y-2 md:col-span-2" : "space-y-2"}>
       <span className="text-xs uppercase tracking-[0.16em] text-slate-500">{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -103,12 +108,13 @@ export function SectionsBuilder({
   onAddSection,
   onRemoveSection,
   onMoveSection,
+  onUpdateFreeTextBlock,
   onAddItem,
   onRemoveItem,
   onUpdateItem,
 }: SectionsBuilderProps) {
-  const [draggedSection, setDraggedSection] = useState<BuilderSectionType | null>(null);
-  const [dropTargetSection, setDropTargetSection] = useState<BuilderSectionType | null>(null);
+  const [draggedSection, setDraggedSection] = useState<string | null>(null);
+  const [dropTargetSection, setDropTargetSection] = useState<string | null>(null);
   const [isAddSectionsModalOpen, setIsAddSectionsModalOpen] = useState(false);
 
   useEffect(() => {
@@ -133,20 +139,20 @@ export function SectionsBuilder({
     };
   }, [isAddSectionsModalOpen]);
 
-  const handleDragStart = (section: BuilderSectionType) => {
-    setDraggedSection(section);
+  const handleDragStart = (sectionId: string) => {
+    setDraggedSection(sectionId);
   };
 
-  const handleDragOver = (event: DragEvent<HTMLDivElement>, section: BuilderSectionType) => {
+  const handleDragOver = (event: DragEvent<HTMLDivElement>, sectionId: string) => {
     event.preventDefault();
-    if (section !== draggedSection) {
-      setDropTargetSection(section);
+    if (sectionId !== draggedSection) {
+      setDropTargetSection(sectionId);
     }
   };
 
-  const handleDrop = (targetSection: BuilderSectionType) => {
-    if (draggedSection && draggedSection !== targetSection) {
-      onMoveSection(draggedSection, targetSection);
+  const handleDrop = (targetSectionId: string) => {
+    if (draggedSection && draggedSection !== targetSectionId) {
+      onMoveSection(draggedSection, targetSectionId);
     }
     setDraggedSection(null);
     setDropTargetSection(null);
@@ -162,10 +168,17 @@ export function SectionsBuilder({
     setIsAddSectionsModalOpen(false);
   };
 
-  const handleUpdateSectionSeparator = (section: BuilderSectionType, value: SectionSeparatorStyle) => {
+  const handleUpdateSectionSeparator = (sectionId: string, value: SectionSeparatorStyle) => {
     onUpdateDraft("sectionSeparators", {
       ...draft.sectionSeparators,
-      [section]: value,
+      [sectionId]: value,
+    });
+  };
+
+  const handleUpdateSectionSpacing = (sectionId: string, value: number) => {
+    onUpdateDraft("sectionSpacing", {
+      ...draft.sectionSpacing,
+      [sectionId]: value,
     });
   };
 
@@ -195,6 +208,11 @@ export function SectionsBuilder({
     { value: "rounded", label: "Arrotondato" },
     { value: "soft", label: "Soft" },
   ];
+  const freeTextAlignmentOptions = [
+    { value: "left", label: "Sinistra", icon: AlignLeft },
+    { value: "center", label: "Centrato", icon: AlignCenter },
+    { value: "right", label: "Destra", icon: AlignRight },
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -212,22 +230,30 @@ export function SectionsBuilder({
       </section>
 
       {draft.builderSections.map((section) => {
-        const sectionDefinition = BUILDER_SECTION_OPTIONS.find((entry) => entry.value === section);
-        const Icon = sectionIcons[section];
-        const isDragging = draggedSection === section;
-        const isDropTarget = dropTargetSection === section && draggedSection !== section;
+        const sectionDefinition = BUILDER_SECTION_OPTIONS.find((entry) => entry.value === section.type);
+        const Icon = sectionIcons[section.type];
+        const isDragging = draggedSection === section.id;
+        const isDropTarget = dropTargetSection === section.id && draggedSection !== section.id;
+        const freeTextBlock = draft.freeTextBlocks.find((block) => block.id === section.id);
+        const sameTypeCount = draft.builderSections.filter((entry) => entry.type === section.type).length;
+        const displayTitle =
+          section.type === "free-text" && sameTypeCount > 1
+            ? `${sectionDefinition?.label ?? section.type} ${draft.builderSections
+                .filter((entry) => entry.type === section.type)
+                .findIndex((entry) => entry.id === section.id) + 1}`
+            : sectionDefinition?.label ?? section.type;
 
         return (
           <div
-            key={section}
-            onDragOver={(event) => handleDragOver(event, section)}
-            onDrop={() => handleDrop(section)}
+            key={section.id}
+            onDragOver={(event) => handleDragOver(event, section.id)}
+            onDrop={() => handleDrop(section.id)}
             className={`rounded-2xl transition-all duration-200 ease-out ${
               isDragging ? "scale-[0.99] opacity-50" : "hover:-translate-y-0.5"
             } ${isDropTarget ? "ring-2 ring-blue-300 ring-offset-2 ring-offset-slate-50" : ""}`}
           >
             <CollapsibleCard
-              title={sectionDefinition?.label ?? section}
+              title={displayTitle}
               icon={Icon}
               contentClassName="space-y-4 px-5 pb-5"
               headerLeading={
@@ -235,12 +261,12 @@ export function SectionsBuilder({
                   draggable
                   onDragStart={(event) => {
                     event.stopPropagation();
-                    handleDragStart(section);
+                    handleDragStart(section.id);
                   }}
                   onDragEnd={resetDragState}
                   onClick={(event) => event.stopPropagation()}
                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 shadow-sm cursor-grab active:cursor-grabbing"
-                  aria-label={`Trascina ${sectionDefinition?.label ?? section}`}
+                  aria-label={`Trascina ${displayTitle}`}
                   title="Trascina sezione"
                 >
                   <GripVertical className="h-4 w-4" />
@@ -249,15 +275,15 @@ export function SectionsBuilder({
               headerActions={
                 <button
                   type="button"
-                  onClick={() => onRemoveSection(section)}
-                  aria-label={`Rimuovi ${sectionDefinition?.label ?? section}`}
+                  onClick={() => onRemoveSection(section.id)}
+                  aria-label={`Rimuovi ${displayTitle}`}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 shadow-sm transition duration-200 hover:border-red-300 hover:bg-red-100 hover:text-red-700"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               }
             >
-              {section === "header" && (
+              {section.type === "header" && (
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Logo" wide>
                     <div className="space-y-3">
@@ -352,7 +378,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "datetime" && (
+              {section.type === "datetime" && (
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Numero ricevuta">
                     <Input value={draft.receiptNumber} onChange={(value) => onUpdateDraft("receiptNumber", value)} />
@@ -369,7 +395,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "columns" && (
+              {section.type === "columns" && (
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Titolo colonna sinistra">
                     <Input value={draft.columnsLeftLabel} onChange={(value) => onUpdateDraft("columnsLeftLabel", value)} />
@@ -380,7 +406,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "line-items" && (
+              {section.type === "line-items" && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-sm text-slate-600">Gestisci le voci che compaiono nel ticket.</p>
@@ -460,7 +486,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "payment" && (
+              {section.type === "payment" && (
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Metodo di pagamento">
                     <Input value={draft.paymentMethod} onChange={(value) => onUpdateDraft("paymentMethod", value)} />
@@ -484,7 +510,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "custom-message" && (
+              {section.type === "custom-message" && (
                 <div className="space-y-3">
                   <Field label="Messaggio personalizzato" wide>
                     <textarea
@@ -513,7 +539,95 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "image" && (
+              {section.type === "free-text" && (
+                <div className="space-y-4">
+                  <Field label="Testo libero" wide>
+                    <RichTextEditor
+                      html={freeTextBlock?.content ?? ""}
+                      onChange={(value) => onUpdateFreeTextBlock(section.id, { content: value })}
+                      baseFontFamily={
+                        FREE_TEXT_FONT_OPTIONS.find((option) => option.value === (freeTextBlock?.fontFamily ?? "inter"))
+                          ?.family ?? FREE_TEXT_FONT_OPTIONS[0].family
+                      }
+                      baseFontSize={freeTextBlock?.fontSize ?? 18}
+                      baseAlignment={freeTextBlock?.alignment ?? "left"}
+                      baseLetterSpacing={freeTextBlock?.letterSpacing ?? 0}
+                    />
+                  </Field>
+                  <Field label="Font" wide>
+                    <div className="grid gap-2 sm:grid-cols-4">
+                      {FREE_TEXT_FONT_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => onUpdateFreeTextBlock(section.id, { fontFamily: option.value })}
+                          className={cn(
+                            "rounded-xl border px-3 py-3 text-sm transition duration-200",
+                            freeTextBlock?.fontFamily === option.value
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-slate-200 bg-white text-slate-600 hover:border-blue-200",
+                          )}
+                          style={{ fontFamily: option.family }}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                  <Field label={`Grandezza ${freeTextBlock?.fontSize ?? 18}px`} wide>
+                    <input
+                      type="range"
+                      min="10"
+                      max="40"
+                      step="1"
+                      value={freeTextBlock?.fontSize ?? 18}
+                      onChange={(event) =>
+                        onUpdateFreeTextBlock(section.id, { fontSize: Number.parseInt(event.target.value, 10) })
+                      }
+                      className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+                    />
+                  </Field>
+                  <Field label={`Spaziatura lettere ${(freeTextBlock?.letterSpacing ?? 0).toFixed(1)}px`} wide>
+                    <input
+                      type="range"
+                      min="-1"
+                      max="8"
+                      step="0.1"
+                      value={freeTextBlock?.letterSpacing ?? 0}
+                      onChange={(event) =>
+                        onUpdateFreeTextBlock(section.id, { letterSpacing: Number.parseFloat(event.target.value) })
+                      }
+                      className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+                    />
+                  </Field>
+                  <Field label="Allineamento" wide>
+                    <div className="grid grid-cols-3 gap-2">
+                      {freeTextAlignmentOptions.map((option) => {
+                        const Icon = option.icon;
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => onUpdateFreeTextBlock(section.id, { alignment: option.value })}
+                            className={cn(
+                              "inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm transition duration-200",
+                              freeTextBlock?.alignment === option.value
+                                ? "border-blue-200 bg-blue-50 text-blue-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:border-blue-200",
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </Field>
+                </div>
+              )}
+
+              {section.type === "image" && (
                 <div className="grid gap-3">
                   <Field label="URL immagine" wide>
                     <Input
@@ -526,7 +640,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "barcode" && (
+              {section.type === "barcode" && (
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Tipo" wide>
                     <div className="grid grid-cols-2 gap-2">
@@ -599,7 +713,7 @@ export function SectionsBuilder({
                 </div>
               )}
 
-              {section === "vat-details" && (
+              {section.type === "vat-details" && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-600">
                   I dettagli IVA vengono calcolati automaticamente in base alle voci inserite nella sezione Elenco
                   Voci. Modifica quantita, prezzi e aliquote per aggiornare il riepilogo.
@@ -610,13 +724,13 @@ export function SectionsBuilder({
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Separatore</p>
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {SECTION_SEPARATOR_OPTIONS.map((option) => {
-                    const isSelected = draft.sectionSeparators[section] === option.value;
+                    const isSelected = draft.sectionSeparators[section.id] === option.value;
 
                     return (
                       <button
                         key={option.value}
                         type="button"
-                        onClick={() => handleUpdateSectionSeparator(section, option.value)}
+                        onClick={() => handleUpdateSectionSeparator(section.id, option.value)}
                         className={cn(
                           "shrink-0 rounded-lg border px-3 py-2 text-xs transition duration-200",
                           isSelected
@@ -629,6 +743,21 @@ export function SectionsBuilder({
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="space-y-3 border-t border-slate-200 pt-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                  {`Spazio sotto ${draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}px`}
+                </p>
+                <input
+                  type="range"
+                  min="0"
+                  max="48"
+                  step="2"
+                  value={draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}
+                  onChange={(event) => handleUpdateSectionSpacing(section.id, Number.parseInt(event.target.value, 10))}
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+                />
               </div>
             </CollapsibleCard>
           </div>
@@ -669,7 +798,7 @@ export function SectionsBuilder({
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {BUILDER_SECTION_OPTIONS.map((option) => {
-                const isAdded = draft.builderSections.includes(option.value);
+                const isAdded = option.value === "free-text" ? false : draft.builderSections.some((entry) => entry.type === option.value);
                 const OptionIcon = sectionIcons[option.value];
 
                 return (

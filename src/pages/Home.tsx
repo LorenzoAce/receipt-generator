@@ -23,6 +23,7 @@ export default function Home() {
     addBuilderSection,
     removeBuilderSection,
     moveBuilderSection,
+    updateFreeTextBlock,
     addItem,
     updateItem,
     removeItem,
@@ -70,6 +71,7 @@ export default function Home() {
               onAddSection={addBuilderSection}
               onRemoveSection={removeBuilderSection}
               onMoveSection={moveBuilderSection}
+              onUpdateFreeTextBlock={updateFreeTextBlock}
               onAddItem={addItem}
               onUpdateItem={updateItem}
               onRemoveItem={removeItem}

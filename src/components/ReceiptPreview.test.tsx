@@ -1,7 +1,7 @@
 import { createRef } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ReceiptPreview } from "./ReceiptPreview";
-import { createDefaultDraft } from "../utils/receipt";
+import { createBuilderSection, createDefaultDraft, createFreeTextBlock } from "../utils/receipt";
 
 describe("ReceiptPreview", () => {
   it("mostra uno scontrino vuoto senza footer automatico quando non ci sono sezioni", () => {
@@ -16,7 +16,12 @@ describe("ReceiptPreview", () => {
 
   it("mostra intestazione e totale nell'anteprima", () => {
     const draft = createDefaultDraft();
-    draft.builderSections = ["header", "line-items", "payment"];
+    draft.builderSections = [
+      createBuilderSection("header", "header"),
+      createBuilderSection("line-items", "items"),
+      createBuilderSection("payment", "payment"),
+    ];
+    draft.sectionSeparators = { header: "equals", items: "equals", payment: "equals" };
 
     render(<ReceiptPreview ref={createRef<HTMLDivElement>()} draft={draft} />);
 
@@ -29,7 +34,8 @@ describe("ReceiptPreview", () => {
 
   it("mostra un QR code quando la sezione barcode usa un link", () => {
     const draft = createDefaultDraft();
-    draft.builderSections = ["barcode"];
+    draft.builderSections = [createBuilderSection("barcode", "barcode")];
+    draft.sectionSeparators = { barcode: "equals" };
     draft.barcodeType = "qr-link";
     draft.barcodeLink = "https://example.com/ricevuta/123";
     draft.qrShape = "rounded";
@@ -46,9 +52,48 @@ describe("ReceiptPreview", () => {
     expect(screen.getByText("Apri ricevuta")).toBeInTheDocument();
   });
 
+  it("mostra il testo libero con stile personalizzato", () => {
+    const draft = createDefaultDraft();
+    draft.builderSections = [createBuilderSection("free-text", "free-1")];
+    draft.freeTextBlocks = [
+      createFreeTextBlock("free-1", {
+        content: '<div><span style="font-family: Georgia; font-size: 26px; font-style: italic;">Testo libero</span><br/>incollato</div>',
+        fontSize: 24,
+        alignment: "center",
+        letterSpacing: 1.6,
+      }),
+    ];
+    draft.sectionSeparators = { "free-1": "equals" };
+
+    render(<ReceiptPreview ref={createRef<HTMLDivElement>()} draft={draft} />);
+
+    const freeText = screen.getByLabelText("Sezione anteprima Testo libero");
+    const styledText = screen.getByText("Testo libero");
+    const freeTextContainer = styledText.closest("div.min-h-14");
+
+    expect(freeText).toBeInTheDocument();
+    expect(freeText).toHaveTextContent("Testo libero");
+    expect(freeText).toHaveTextContent("incollato");
+    expect(freeTextContainer).toHaveStyle({ fontSize: "24px", letterSpacing: "1.6px" });
+    expect(freeTextContainer).toHaveClass("text-center");
+    expect(styledText).toHaveStyle({ fontFamily: "Georgia", fontSize: "26px", fontStyle: "italic" });
+  });
+
+  it("applica lo spazio verticale della singola sezione", () => {
+    const draft = createDefaultDraft();
+    draft.builderSections = [createBuilderSection("header", "header"), createBuilderSection("payment", "payment")];
+    draft.sectionSeparators = { header: "equals", payment: "equals" };
+    draft.sectionSpacing = { header: 34, payment: 12 };
+
+    render(<ReceiptPreview ref={createRef<HTMLDivElement>()} draft={draft} />);
+
+    expect(screen.getByLabelText("Sezione anteprima Intestazione")).toHaveStyle({ marginBottom: "34px" });
+  });
+
   it("rispetta l'ordine delle sezioni nell'anteprima", () => {
     const draft = createDefaultDraft();
-    draft.builderSections = ["payment", "header"];
+    draft.builderSections = [createBuilderSection("payment", "payment"), createBuilderSection("header", "header")];
+    draft.sectionSeparators = { payment: "equals", header: "equals" };
 
     render(<ReceiptPreview ref={createRef<HTMLDivElement>()} draft={draft} />);
 
@@ -60,7 +105,8 @@ describe("ReceiptPreview", () => {
 
   it("chiama il riordino quando trascini una sezione nell'anteprima", () => {
     const draft = createDefaultDraft();
-    draft.builderSections = ["header", "payment"];
+    draft.builderSections = [createBuilderSection("header", "header"), createBuilderSection("payment", "payment")];
+    draft.sectionSeparators = { header: "equals", payment: "equals" };
     const onMoveSection = vi.fn();
 
     render(<ReceiptPreview ref={createRef<HTMLDivElement>()} draft={draft} onMoveSection={onMoveSection} />);

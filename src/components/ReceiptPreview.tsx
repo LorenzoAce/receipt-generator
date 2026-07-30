@@ -1,6 +1,7 @@
 import { forwardRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { GripVertical } from "lucide-react";
 import { cn } from "../lib/utils";
+import { sanitizeRichTextHtml } from "../utils/richText";
 import {
   BUILDER_SECTION_OPTIONS,
   PAPER_SPECS,
@@ -9,16 +10,18 @@ import {
   calculateLineTotal,
   calculateSummary,
   formatCurrencyForPreview,
+  getFreeTextFontFamily,
   getPreviewFontFamily,
   getThermalIntensityBoost,
   getVatBreakdown,
+  type BuilderSectionInstance,
   type BuilderSectionType,
   type ReceiptDraft,
 } from "../utils/receipt";
 
 type ReceiptPreviewProps = {
   draft: ReceiptDraft;
-  onMoveSection?: (draggedSection: BuilderSectionType, targetSection: BuilderSectionType) => void;
+  onMoveSection?: (draggedSectionId: string, targetSectionId: string) => void;
 };
 
 export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(function ReceiptPreview(
@@ -37,40 +40,40 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
   const qrCodeImageUrl = draft.barcodeType === "qr-link" ? buildQrCodeImageUrl(draft.barcodeLink, draft.qrSize) : "";
   const qrBorderRadius = draft.qrShape === "rounded" ? "22px" : draft.qrShape === "soft" ? "34px" : "0px";
   const canReorderInPreview = typeof onMoveSection === "function" && draft.builderSections.length > 1;
-  const [draggedSection, setDraggedSection] = useState<BuilderSectionType | null>(null);
-  const [dropTargetSection, setDropTargetSection] = useState<BuilderSectionType | null>(null);
+  const [draggedSection, setDraggedSection] = useState<string | null>(null);
+  const [dropTargetSection, setDropTargetSection] = useState<string | null>(null);
 
   const sectionLabels = Object.fromEntries(
     BUILDER_SECTION_OPTIONS.map((option) => [option.value, option.label]),
   ) as Record<BuilderSectionType, string>;
 
-  const handleDragStart = (section: BuilderSectionType) => {
+  const handleDragStart = (sectionId: string) => {
     if (!canReorderInPreview) {
       return;
     }
 
-    setDraggedSection(section);
+    setDraggedSection(sectionId);
   };
 
-  const handleDragOver = (event: DragEvent<HTMLDivElement>, section: BuilderSectionType) => {
+  const handleDragOver = (event: DragEvent<HTMLDivElement>, sectionId: string) => {
     if (!canReorderInPreview || draggedSection === null) {
       return;
     }
 
     event.preventDefault();
 
-    if (section !== draggedSection) {
-      setDropTargetSection(section);
+    if (sectionId !== draggedSection) {
+      setDropTargetSection(sectionId);
     }
   };
 
-  const handleDrop = (targetSection: BuilderSectionType) => {
+  const handleDrop = (targetSectionId: string) => {
     if (!canReorderInPreview || !onMoveSection || draggedSection === null) {
       return;
     }
 
-    if (draggedSection !== targetSection) {
-      onMoveSection(draggedSection, targetSection);
+    if (draggedSection !== targetSectionId) {
+      onMoveSection(draggedSection, targetSectionId);
     }
 
     setDraggedSection(null);
@@ -82,8 +85,8 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
     setDropTargetSection(null);
   };
 
-  const renderSectionSeparator = (section: BuilderSectionType, className = "mt-3") => {
-    const separator = buildSectionSeparatorLine(draft.sectionSeparators[section], previewSeparatorColumns);
+  const renderSectionSeparator = (sectionId: string, className = "mt-3") => {
+    const separator = buildSectionSeparatorLine(draft.sectionSeparators[sectionId] ?? "none", previewSeparatorColumns);
 
     if (separator === null) {
       return null;
@@ -100,8 +103,8 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
     );
   };
 
-  const renderSectionContent = (section: BuilderSectionType): ReactNode => {
-    if (section === "header") {
+  const renderSectionContent = (section: BuilderSectionInstance): ReactNode => {
+    if (section.type === "header") {
       return (
         <div className={cn("space-y-1", draft.layout.headerAlignment === "center" && "text-center")}>
           {draft.logoImageUrl && (
@@ -135,12 +138,12 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
             {draft.vatNumber && <p>P.IVA {draft.vatNumber}</p>}
             <p>{draft.phone}</p>
           </div>
-          {renderSectionSeparator("header", "pt-2")}
+          {renderSectionSeparator(section.id, "pt-2")}
         </div>
       );
     }
 
-    if (section === "datetime") {
+    if (section.type === "datetime") {
       return (
         <div className="space-y-1 text-[11px]">
           <div className="flex justify-between gap-4">
@@ -159,24 +162,24 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
             <span>Cassa</span>
             <span>{draft.cashier}</span>
           </div>
-          {renderSectionSeparator("datetime")}
+          {renderSectionSeparator(section.id)}
         </div>
       );
     }
 
-    if (section === "columns") {
+    if (section.type === "columns") {
       return (
         <div>
           <div className="flex justify-between text-[11px] uppercase tracking-[0.14em] text-slate-500">
             <span>{draft.columnsLeftLabel}</span>
             <span>{draft.columnsRightLabel}</span>
           </div>
-          {renderSectionSeparator("columns", "mt-2")}
+          {renderSectionSeparator(section.id, "mt-2")}
         </div>
       );
     }
 
-    if (section === "line-items") {
+    if (section.type === "line-items") {
       return (
         <div>
           <div className="space-y-3">
@@ -198,12 +201,12 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
               </div>
             ))}
           </div>
-          {renderSectionSeparator("line-items")}
+          {renderSectionSeparator(section.id)}
         </div>
       );
     }
 
-    if (section === "vat-details") {
+    if (section.type === "vat-details") {
       return (
         <div className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Dettagli IVA</p>
@@ -219,12 +222,12 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
               </div>
             </div>
           ))}
-          {renderSectionSeparator("vat-details")}
+          {renderSectionSeparator(section.id)}
         </div>
       );
     }
 
-    if (section === "payment") {
+    if (section.type === "payment") {
       return (
         <div className="space-y-2">
           <div className="flex justify-between gap-4">
@@ -255,23 +258,49 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
             <span>Pagamento</span>
             <span>{draft.paymentMethod}</span>
           </div>
-          {renderSectionSeparator("payment")}
+          {renderSectionSeparator(section.id)}
         </div>
       );
     }
 
-    if (section === "custom-message") {
+    if (section.type === "custom-message") {
       return (
         <div className="text-[11px]">
           {draft.customMessage && <p className="mt-2 leading-5 text-slate-600">{draft.customMessage}</p>}
           {draft.notes && <p className="mt-2 leading-5 text-slate-600">{draft.notes}</p>}
           {draft.footerMessage && <p className="mt-2 leading-5 text-slate-500">{draft.footerMessage}</p>}
-          {renderSectionSeparator("custom-message")}
+          {renderSectionSeparator(section.id)}
         </div>
       );
     }
 
-    if (section === "image") {
+    if (section.type === "free-text") {
+      const freeTextBlock = draft.freeTextBlocks.find((block) => block.id === section.id);
+      const freeTextFontFamily = getFreeTextFontFamily(freeTextBlock?.fontFamily ?? "inter");
+      const sanitizedHtml = sanitizeRichTextHtml(freeTextBlock?.content ?? "");
+
+      return (
+        <div>
+          <div
+            className={cn(
+              "min-h-14 break-words [&_a]:text-blue-600 [&_a]:underline [&_p]:my-0 [&_ul]:my-0 [&_ol]:my-0",
+              freeTextBlock?.alignment === "center" && "text-center",
+              freeTextBlock?.alignment === "right" && "text-right",
+            )}
+            style={{
+              fontFamily: freeTextFontFamily,
+              fontSize: `${freeTextBlock?.fontSize ?? 18}px`,
+              lineHeight: 1.45,
+              letterSpacing: `${freeTextBlock?.letterSpacing ?? 0}px`,
+            }}
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml || "&nbsp;" }}
+          />
+          {renderSectionSeparator(section.id)}
+        </div>
+      );
+    }
+
+    if (section.type === "image") {
       if (!draft.imageUrl) {
         return null;
       }
@@ -283,12 +312,12 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
             alt="Sezione immagine"
             className="mx-auto max-h-40 rounded-xl border border-slate-200 object-contain"
           />
-          {renderSectionSeparator("image")}
+          {renderSectionSeparator(section.id)}
         </div>
       );
     }
 
-    if (section === "barcode") {
+    if (section.type === "barcode") {
       if (draft.barcodeType === "barcode" && draft.barcodeValue) {
         return (
           <div className="text-center text-[11px] text-slate-500">
@@ -297,7 +326,7 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
               <p className="mt-2 tracking-[0.22em] text-slate-700">{draft.barcodeValue}</p>
               {draft.barcodeCaption && <p className="mt-1 text-slate-500">{draft.barcodeCaption}</p>}
             </div>
-            {renderSectionSeparator("barcode")}
+            {renderSectionSeparator(section.id)}
           </div>
         );
       }
@@ -319,7 +348,7 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
               <p className="mt-2 break-all text-slate-700">{draft.barcodeLink}</p>
               {draft.barcodeCaption && <p className="mt-1 text-slate-500">{draft.barcodeCaption}</p>}
             </div>
-            {renderSectionSeparator("barcode")}
+            {renderSectionSeparator(section.id)}
           </div>
         );
       }
@@ -330,35 +359,42 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
     return null;
   };
 
-  const renderPreviewSection = (section: BuilderSectionType, index: number) => {
+  const renderPreviewSection = (section: BuilderSectionInstance, index: number) => {
     const content = renderSectionContent(section);
 
     if (!content) {
       return null;
     }
 
-    const label = sectionLabels[section] ?? section;
-    const isDragging = draggedSection === section;
-    const isDropTarget = dropTargetSection === section && draggedSection !== section;
+    const duplicateIndex =
+      draft.builderSections.filter((entry) => entry.type === section.type).findIndex((entry) => entry.id === section.id) + 1;
+    const labelBase = sectionLabels[section.type] ?? section.type;
+    const label = section.type === "free-text" && draft.builderSections.filter((entry) => entry.type === section.type).length > 1
+      ? `${labelBase} ${duplicateIndex}`
+      : labelBase;
+    const isDragging = draggedSection === section.id;
+    const isDropTarget = dropTargetSection === section.id && draggedSection !== section.id;
+    const spacingAfter = draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing;
+    const hasNextSection = index < draft.builderSections.length - 1;
 
     return (
       <div
-        key={section}
-        onDragOver={(event) => handleDragOver(event, section)}
-        onDrop={() => handleDrop(section)}
+        key={section.id}
+        onDragOver={(event) => handleDragOver(event, section.id)}
+        onDrop={() => handleDrop(section.id)}
         className={cn(
-          index > 0 && (compact ? "mt-3" : "mt-5"),
           "relative transition-all duration-200 ease-out",
           isDragging && "opacity-45",
           isDropTarget && "rounded-xl ring-2 ring-blue-300 ring-offset-2 ring-offset-white",
         )}
+        style={hasNextSection ? { marginBottom: `${spacingAfter}px` } : undefined}
         aria-label={`Sezione anteprima ${label}`}
       >
         {canReorderInPreview && (
           <div className="no-print mb-2 flex justify-end">
             <span
               draggable
-              onDragStart={() => handleDragStart(section)}
+              onDragStart={() => handleDragStart(section.id)}
               onDragEnd={resetDragState}
               className="inline-flex h-7 w-7 cursor-grab items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 active:cursor-grabbing"
               aria-label={`Trascina ${label} nell'anteprima`}

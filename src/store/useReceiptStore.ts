@@ -1,7 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  createDefaultSectionSeparators,
+  createBuilderSection,
+  createFreeTextBlock,
+  mapLayoutSeparatorStyle,
   type BuilderSectionType,
   createDefaultDraft,
   createEmptyItem,
@@ -22,8 +24,9 @@ type ReceiptStore = {
   updateDraft: <K extends keyof ReceiptDraft>(field: K, value: ReceiptDraft[K]) => void;
   updateLayout: <K extends keyof ReceiptLayout>(field: K, value: ReceiptLayout[K]) => void;
   addBuilderSection: (section: BuilderSectionType) => void;
-  removeBuilderSection: (section: BuilderSectionType) => void;
-  moveBuilderSection: (draggedSection: BuilderSectionType, targetSection: BuilderSectionType) => void;
+  removeBuilderSection: (sectionId: string) => void;
+  moveBuilderSection: (draggedSectionId: string, targetSectionId: string) => void;
+  updateFreeTextBlock: (sectionId: string, updates: Partial<ReceiptDraft["freeTextBlocks"][number]>) => void;
   toggleSection: (section: ReceiptSectionKey) => void;
   addItem: () => void;
   updateItem: <K extends keyof ReceiptItem>(id: string, field: K, value: ReceiptItem[K]) => void;
@@ -51,9 +54,6 @@ const mergeTemplate = (current: ReceiptDraft, templateId: string) => {
       ...current.sections,
       ...template.draft.sections,
     },
-    sectionSeparators:
-      template.draft.sectionSeparators ??
-      createDefaultSectionSeparators(template.draft.layout?.separatorStyle ?? current.layout.separatorStyle),
   });
 };
 
@@ -91,25 +91,64 @@ export const useReceiptStore = create<ReceiptStore>()(
         })),
       addBuilderSection: (section) =>
         set((state) => ({
-          draft: {
-            ...state.draft,
-            builderSections: state.draft.builderSections.includes(section)
-              ? state.draft.builderSections
-              : [...state.draft.builderSections, section],
-          },
+          draft:
+            section !== "free-text" && state.draft.builderSections.some((entry) => entry.type === section)
+              ? state.draft
+              : (() => {
+                  const builderSection = createBuilderSection(section);
+                  const nextDraft: ReceiptDraft = {
+                    ...state.draft,
+                    builderSections: [...state.draft.builderSections, builderSection],
+                    sectionSeparators: {
+                      ...state.draft.sectionSeparators,
+                      [builderSection.id]: mapLayoutSeparatorStyle(state.draft.layout.separatorStyle),
+                    },
+                    sectionSpacing: {
+                      ...state.draft.sectionSpacing,
+                      [builderSection.id]: state.draft.layout.sectionSpacing,
+                    },
+                  };
+
+                  if (section === "free-text") {
+                    nextDraft.freeTextBlocks = [...state.draft.freeTextBlocks, createFreeTextBlock(builderSection.id)];
+                  }
+
+                  return nextDraft;
+                })(),
         })),
-      removeBuilderSection: (section) =>
+      removeBuilderSection: (sectionId) =>
         set((state) => ({
           draft: {
             ...state.draft,
-            builderSections: state.draft.builderSections.filter((entry) => entry !== section),
+            builderSections: state.draft.builderSections.filter((entry) => entry.id !== sectionId),
+            sectionSeparators: Object.fromEntries(
+              Object.entries(state.draft.sectionSeparators).filter(([key]) => key !== sectionId),
+            ),
+            sectionSpacing: Object.fromEntries(
+              Object.entries(state.draft.sectionSpacing).filter(([key]) => key !== sectionId),
+            ),
+            freeTextBlocks: state.draft.freeTextBlocks.filter((block) => block.id !== sectionId),
           },
         })),
-      moveBuilderSection: (draggedSection, targetSection) =>
+      moveBuilderSection: (draggedSectionId, targetSectionId) =>
         set((state) => ({
           draft: {
             ...state.draft,
-            builderSections: reorderBuilderSections(state.draft.builderSections, draggedSection, targetSection),
+            builderSections: reorderBuilderSections(state.draft.builderSections, draggedSectionId, targetSectionId),
+          },
+        })),
+      updateFreeTextBlock: (sectionId, updates) =>
+        set((state) => ({
+          draft: {
+            ...state.draft,
+            freeTextBlocks: state.draft.freeTextBlocks.map((block) =>
+              block.id === sectionId
+                ? {
+                    ...block,
+                    ...updates,
+                  }
+                : block,
+            ),
           },
         })),
       toggleSection: (section) =>
