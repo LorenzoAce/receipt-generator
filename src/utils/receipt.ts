@@ -99,6 +99,10 @@ export type ReceiptDraft = {
   builderSections: BuilderSectionInstance[];
   sectionSeparators: Record<string, SectionSeparatorStyle>;
   sectionSpacing: Record<string, number>;
+  sectionSpacingTop: Record<string, number>;
+  sectionSpacingBottom: Record<string, number>;
+  sectionSeparatorHeight: Record<string, number>;
+  sectionSeparatorWidth: Record<string, number>;
   freeTextBlocks: FreeTextBlock[];
 };
 
@@ -261,9 +265,9 @@ export const SECTION_LABELS: Array<{ key: ReceiptSectionKey; label: string }> = 
   { key: "footer", label: "Footer" },
 ];
 
-export const PAPER_SPECS: Record<PaperWidth, { widthMm: number; widthPx: number; columns: number }> = {
-  "80mm": { widthMm: 80, widthPx: 332, columns: 32 },
-  "62mm": { widthMm: 62, widthPx: 258, columns: 24 },
+export const PAPER_SPECS: Record<PaperWidth, { widthMm: number; columns: number }> = {
+  "80mm": { widthMm: 80, columns: 32 },
+  "62mm": { widthMm: 62, columns: 24 },
 };
 
 const baseSections: Record<ReceiptSectionKey, boolean> = {
@@ -356,6 +360,10 @@ export const createDefaultDraft = (): ReceiptDraft => ({
   builderSections: [],
   sectionSeparators: {},
   sectionSpacing: {},
+  sectionSpacingTop: {},
+  sectionSpacingBottom: {},
+  sectionSeparatorHeight: {},
+  sectionSeparatorWidth: {},
   freeTextBlocks: [],
 });
 
@@ -455,7 +463,61 @@ export function normalizeDraft(partial?: LegacyReceiptDraft | null): ReceiptDraf
     const value = legacySpacing?.[section.id] ?? legacySpacing?.[section.type];
 
     if (typeof value === "number" && Number.isFinite(value)) {
-      accumulator[section.id] = Math.max(0, value);
+      accumulator[section.id] = value;
+    }
+
+    return accumulator;
+  }, {});
+  const migratedSpacingTop = builderSections.reduce<Record<string, number>>((accumulator, section) => {
+    const spacingTop = partial.sectionSpacingTop as Record<string, number> | undefined;
+    const legacySpacing = partial.sectionSpacing as Record<string, number> | undefined;
+    const value =
+      spacingTop?.[section.id] ??
+      spacingTop?.[section.type] ??
+      legacySpacing?.[section.id] ??
+      legacySpacing?.[section.type] ??
+      0;
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      accumulator[section.id] = value;
+    }
+
+    return accumulator;
+  }, {});
+  const migratedSpacingBottom = builderSections.reduce<Record<string, number>>((accumulator, section) => {
+    const spacingBottom = partial.sectionSpacingBottom as Record<string, number> | undefined;
+    const legacySpacing = partial.sectionSpacing as Record<string, number> | undefined;
+    const value =
+      spacingBottom?.[section.id] ??
+      spacingBottom?.[section.type] ??
+      legacySpacing?.[section.id] ??
+      legacySpacing?.[section.type] ??
+      mergedLayout.sectionSpacing;
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      accumulator[section.id] = value;
+    }
+
+    return accumulator;
+  }, {});
+  const separatorHeightDefaults = createDefaultSectionSeparatorHeight(builderSections);
+  const migratedSeparatorHeight = builderSections.reduce<Record<string, number>>((accumulator, section) => {
+    const separatorHeight = partial.sectionSeparatorHeight as Record<string, number> | undefined;
+    const value = separatorHeight?.[section.id] ?? separatorHeight?.[section.type];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      accumulator[section.id] = value;
+    }
+
+    return accumulator;
+  }, {});
+  const separatorWidthDefaults = createDefaultSectionSeparatorWidth(builderSections);
+  const migratedSeparatorWidth = builderSections.reduce<Record<string, number>>((accumulator, section) => {
+    const separatorWidth = partial.sectionSeparatorWidth as Record<string, number> | undefined;
+    const value = separatorWidth?.[section.id] ?? separatorWidth?.[section.type];
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      accumulator[section.id] = value;
     }
 
     return accumulator;
@@ -478,6 +540,22 @@ export function normalizeDraft(partial?: LegacyReceiptDraft | null): ReceiptDraf
     sectionSpacing: {
       ...spacingDefaults,
       ...migratedSpacing,
+    },
+    sectionSpacingTop: {
+      ...createDefaultSectionSpacing(0, builderSections),
+      ...migratedSpacingTop,
+    },
+    sectionSpacingBottom: {
+      ...spacingDefaults,
+      ...migratedSpacingBottom,
+    },
+    sectionSeparatorHeight: {
+      ...separatorHeightDefaults,
+      ...migratedSeparatorHeight,
+    },
+    sectionSeparatorWidth: {
+      ...separatorWidthDefaults,
+      ...migratedSeparatorWidth,
     },
     freeTextBlocks,
   };
@@ -543,6 +621,24 @@ export function createDefaultSectionSpacing(
 ): Record<string, number> {
   return builderSections.reduce<Record<string, number>>((accumulator, section) => {
     accumulator[section.id] = fallbackSpacing;
+    return accumulator;
+  }, {});
+}
+
+export function createDefaultSectionSeparatorHeight(
+  builderSections: BuilderSectionInstance[],
+): Record<string, number> {
+  return builderSections.reduce<Record<string, number>>((accumulator, section) => {
+    accumulator[section.id] = 0;
+    return accumulator;
+  }, {});
+}
+
+export function createDefaultSectionSeparatorWidth(
+  builderSections: BuilderSectionInstance[],
+): Record<string, number> {
+  return builderSections.reduce<Record<string, number>>((accumulator, section) => {
+    accumulator[section.id] = 100;
     return accumulator;
   }, {});
 }

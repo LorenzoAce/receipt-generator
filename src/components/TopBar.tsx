@@ -1,4 +1,4 @@
-import { ChevronDown, Menu, Moon, ReceiptText, Sun } from "lucide-react";
+import { ChevronDown, Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { cn } from "../lib/utils";
@@ -33,11 +33,16 @@ export function TopBar({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <div className="mr-1 flex items-center gap-3">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-[0_10px_24px_rgba(37,99,235,0.25)]">
-              <ReceiptText className="h-5 w-5" />
+            <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.08)] dark:border-slate-700 dark:bg-slate-950">
+              <img src="/logo.png" alt="Receipt Generator" className="h-full w-full object-cover" />
             </span>
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Receipt Generator</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Receipt Generator</div>
+                <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/10 dark:text-blue-300">
+                  1.0
+                </span>
+              </div>
               <div className="text-xs text-slate-500 dark:text-slate-400">Builder professionale per ricevute termiche</div>
             </div>
           </div>

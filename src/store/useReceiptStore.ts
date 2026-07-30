@@ -107,6 +107,22 @@ export const useReceiptStore = create<ReceiptStore>()(
                       ...state.draft.sectionSpacing,
                       [builderSection.id]: state.draft.layout.sectionSpacing,
                     },
+                    sectionSpacingTop: {
+                      ...state.draft.sectionSpacingTop,
+                      [builderSection.id]: 0,
+                    },
+                    sectionSpacingBottom: {
+                      ...state.draft.sectionSpacingBottom,
+                      [builderSection.id]: state.draft.layout.sectionSpacing,
+                    },
+                    sectionSeparatorHeight: {
+                      ...state.draft.sectionSeparatorHeight,
+                      [builderSection.id]: 0,
+                    },
+                    sectionSeparatorWidth: {
+                      ...state.draft.sectionSeparatorWidth,
+                      [builderSection.id]: 100,
+                    },
                   };
 
                   if (section === "free-text") {
@@ -126,6 +142,18 @@ export const useReceiptStore = create<ReceiptStore>()(
             ),
             sectionSpacing: Object.fromEntries(
               Object.entries(state.draft.sectionSpacing).filter(([key]) => key !== sectionId),
+            ),
+            sectionSpacingTop: Object.fromEntries(
+              Object.entries(state.draft.sectionSpacingTop).filter(([key]) => key !== sectionId),
+            ),
+            sectionSpacingBottom: Object.fromEntries(
+              Object.entries(state.draft.sectionSpacingBottom).filter(([key]) => key !== sectionId),
+            ),
+            sectionSeparatorHeight: Object.fromEntries(
+              Object.entries(state.draft.sectionSeparatorHeight).filter(([key]) => key !== sectionId),
+            ),
+            sectionSeparatorWidth: Object.fromEntries(
+              Object.entries(state.draft.sectionSeparatorWidth).filter(([key]) => key !== sectionId),
             ),
             freeTextBlocks: state.draft.freeTextBlocks.filter((block) => block.id !== sectionId),
           },

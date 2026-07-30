@@ -180,6 +180,31 @@ export function SectionsBuilder({
       ...draft.sectionSpacing,
       [sectionId]: value,
     });
+    onUpdateDraft("sectionSpacingBottom", {
+      ...draft.sectionSpacingBottom,
+      [sectionId]: value,
+    });
+  };
+
+  const handleUpdateSectionSpacingTop = (sectionId: string, value: number) => {
+    onUpdateDraft("sectionSpacingTop", {
+      ...draft.sectionSpacingTop,
+      [sectionId]: value,
+    });
+  };
+
+  const handleUpdateSectionSeparatorHeight = (sectionId: string, value: number) => {
+    onUpdateDraft("sectionSeparatorHeight", {
+      ...draft.sectionSeparatorHeight,
+      [sectionId]: value,
+    });
+  };
+
+  const handleUpdateSectionSeparatorWidth = (sectionId: string, value: number) => {
+    onUpdateDraft("sectionSeparatorWidth", {
+      ...draft.sectionSeparatorWidth,
+      [sectionId]: value,
+    });
   };
 
   const handleLogoUpload = (file: File | null) => {
@@ -730,18 +755,67 @@ export function SectionsBuilder({
                     );
                   })}
                 </div>
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    {`Altezza separatore ${draft.sectionSeparatorHeight[section.id] ?? 0}px`}
+                  </p>
+                  <input
+                    type="range"
+                    min="-48"
+                    max="48"
+                    step="1"
+                    value={draft.sectionSeparatorHeight[section.id] ?? 0}
+                    onChange={(event) =>
+                      handleUpdateSectionSeparatorHeight(section.id, Number.parseInt(event.target.value, 10))
+                    }
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+                  />
+                </div>
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    {`Larghezza separatore ${draft.sectionSeparatorWidth[section.id] ?? 100}%`}
+                  </p>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    step="1"
+                    value={draft.sectionSeparatorWidth[section.id] ?? 100}
+                    onChange={(event) =>
+                      handleUpdateSectionSeparatorWidth(section.id, Number.parseInt(event.target.value, 10))
+                    }
+                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+                  />
+                </div>
               </div>
 
               <div className="space-y-3 border-t border-slate-200 pt-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-                  {`Spazio sotto ${draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}px`}
+                  {`Spazio sopra ${draft.sectionSpacingTop[section.id] ?? 0}px`}
                 </p>
                 <input
                   type="range"
-                  min="-16"
+                  min="-48"
                   max="48"
                   step="1"
-                  value={draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}
+                  value={draft.sectionSpacingTop[section.id] ?? 0}
+                  onChange={(event) =>
+                    handleUpdateSectionSpacingTop(section.id, Number.parseInt(event.target.value, 10))
+                  }
+                  className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
+                />
+              </div>
+
+              <div className="space-y-3 border-t border-slate-200 pt-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                  {`Spazio sotto ${draft.sectionSpacingBottom[section.id] ?? draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}px`}
+                </p>
+                <input
+                  type="range"
+                  min="-48"
+                  max="48"
+                  step="1"
+                  value={draft.sectionSpacingBottom[section.id] ?? draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing}
                   onChange={(event) => handleUpdateSectionSpacing(section.id, Number.parseInt(event.target.value, 10))}
                   className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600"
                 />

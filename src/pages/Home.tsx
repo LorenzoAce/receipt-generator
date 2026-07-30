@@ -35,8 +35,12 @@ export default function Home() {
     window.print();
   };
 
-  const handleExportPdf = () => {
-    exportReceiptPdf(draft);
+  const handleExportPdf = async () => {
+    try {
+      await exportReceiptPdf(draft, previewRef.current);
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   const handleScrollToMenu = () => {

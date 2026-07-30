@@ -40,6 +40,7 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
   const qrCodeImageUrl = draft.barcodeType === "qr-link" ? buildQrCodeImageUrl(draft.barcodeLink, draft.qrSize) : "";
   const qrBorderRadius = draft.qrShape === "rounded" ? "22px" : draft.qrShape === "soft" ? "34px" : "0px";
   const canReorderInPreview = typeof onMoveSection === "function" && draft.builderSections.length > 1;
+  const horizontalTicketPadding = compact ? 20 : 24;
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
   const [dropTargetSection, setDropTargetSection] = useState<string | null>(null);
 
@@ -86,22 +87,46 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
   };
 
   const renderSectionSeparator = (sectionId: string, className = "mt-3") => {
-    const separator = buildSectionSeparatorLine(draft.sectionSeparators[sectionId] ?? "none", previewSeparatorColumns);
+    const separatorWidth = Math.min(Math.max(draft.sectionSeparatorWidth[sectionId] ?? 100, 20), 100);
+    const separatorColumns = Math.max(Math.ceil(previewSeparatorColumns * (separatorWidth / 100) * 4), previewSeparatorColumns);
+    const separator = buildSectionSeparatorLine(draft.sectionSeparators[sectionId] ?? "none", separatorColumns);
+    const separatorHeight = draft.sectionSeparatorHeight[sectionId] ?? 0;
+    const effectiveBlankHeight = Math.max(16 + separatorHeight, 0);
+    const effectiveLineHeight = Math.max(12 + separatorHeight, 0);
 
     if (separator === null) {
       return null;
     }
 
     if (separator === "") {
-      return <div className={cn(className, "h-4 w-full")} />;
+      return <div className={cn(className, "w-full")} style={{ height: `${effectiveBlankHeight}px` }} />;
     }
 
     return (
-      <div className={cn(className, "w-full overflow-hidden")}>
-        <p className="w-full text-center text-[11px] leading-none text-slate-400 whitespace-nowrap">{separator}</p>
+      <div
+        className={cn(className, "flex items-center")}
+        style={getFullBleedStyle(undefined, { minHeight: `${effectiveLineHeight}px` })}
+      >
+        <p
+          className="mx-auto overflow-hidden whitespace-nowrap text-center text-[11px] leading-none"
+          style={{
+            width: `${separatorWidth}%`,
+            color: draft.layout.textColor,
+            opacity: 0.55,
+            fontFamily: '"Courier New", "IBM Plex Mono", monospace',
+          }}
+        >
+          {separator}
+        </p>
       </div>
     );
   };
+
+  const getFullBleedStyle = (widthPercent = 100, extraStyles?: CSSProperties): CSSProperties => ({
+    marginLeft: `-${horizontalTicketPadding}px`,
+    width: `calc(100% + ${horizontalTicketPadding * 2}px)`,
+    ...extraStyles,
+  });
 
   const renderSectionContent = (section: BuilderSectionInstance): ReactNode => {
     if (section.type === "header") {
@@ -281,20 +306,22 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
 
       return (
         <div>
-          <div
-            className={cn(
-              "min-h-14 break-words [&_a]:text-blue-600 [&_a]:underline [&_p]:my-0 [&_ul]:my-0 [&_ol]:my-0",
-              freeTextBlock?.alignment === "center" && "text-center",
-              freeTextBlock?.alignment === "right" && "text-right",
-            )}
-            style={{
-              fontFamily: freeTextFontFamily,
-              fontSize: `${freeTextBlock?.fontSize ?? 18}px`,
-              lineHeight: 1.45,
-              letterSpacing: `${freeTextBlock?.letterSpacing ?? 0}px`,
-            }}
-            dangerouslySetInnerHTML={{ __html: sanitizedHtml || "&nbsp;" }}
-          />
+          <div style={getFullBleedStyle()}>
+            <div
+              className={cn(
+                "min-h-14 break-words px-0 [&_a]:text-blue-600 [&_a]:underline [&_p]:my-0 [&_ul]:my-0 [&_ol]:my-0",
+                freeTextBlock?.alignment === "center" && "text-center",
+                freeTextBlock?.alignment === "right" && "text-right",
+              )}
+              style={{
+                fontFamily: freeTextFontFamily,
+                fontSize: `${freeTextBlock?.fontSize ?? 18}px`,
+                lineHeight: 1.45,
+                letterSpacing: `${freeTextBlock?.letterSpacing ?? 0}px`,
+              }}
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml || "&nbsp;" }}
+            />
+          </div>
           {renderSectionSeparator(section.id)}
         </div>
       );
@@ -374,7 +401,9 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
       : labelBase;
     const isDragging = draggedSection === section.id;
     const isDropTarget = dropTargetSection === section.id && draggedSection !== section.id;
-    const spacingAfter = draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing;
+    const spacingBefore = draft.sectionSpacingTop[section.id] ?? 0;
+    const spacingAfter =
+      draft.sectionSpacingBottom[section.id] ?? draft.sectionSpacing[section.id] ?? draft.layout.sectionSpacing;
     const hasNextSection = index < draft.builderSections.length - 1;
 
     return (
@@ -387,7 +416,10 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
           isDragging && "opacity-45",
           isDropTarget && "rounded-xl ring-2 ring-blue-300 ring-offset-2 ring-offset-white",
         )}
-        style={hasNextSection ? { marginBottom: `${spacingAfter}px` } : undefined}
+        style={{
+          marginTop: `${spacingBefore}px`,
+          ...(hasNextSection ? { marginBottom: `${spacingAfter}px` } : {}),
+        }}
         aria-label={`Sezione anteprima ${label}`}
       >
         {canReorderInPreview && (
@@ -420,7 +452,9 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
         )}
         style={
           {
-            width: `${paperSpec.widthPx}px`,
+            width: `${paperSpec.widthMm}mm`,
+            minWidth: `${paperSpec.widthMm}mm`,
+            maxWidth: `${paperSpec.widthMm}mm`,
             color: draft.layout.textColor,
             "--paper-width-mm": `${paperSpec.widthMm}mm`,
           } as CSSProperties
@@ -443,6 +477,7 @@ export const ReceiptPreview = forwardRef<HTMLDivElement, ReceiptPreviewProps>(fu
           style={{
             fontFamily: previewFontFamily,
             opacity: Math.min(textOpacity + thermalBoost * 0.25, 1),
+            lineHeight: 1.5,
             textShadow: draft.layout.thermalEffect
               ? `0 0 0.2px ${draft.layout.textColor}, 0.35px 0.35px 0 rgba(60,45,34,${Math.min(0.18 + thermalBoost, 0.4)})`
               : "none",
